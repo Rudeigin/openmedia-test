@@ -45,12 +45,11 @@ Window {
             ListView {
                 id: equalFiles
                 anchors.fill: parent
-                model: FileManager.duplicateFiles
                 spacing: 5
                 clip: true
                 delegate: Label {
                     width: equalFiles.width
-                    text: equalFiles.createString(modelData)
+                    text: index + ". " + equalFiles.createString(modelData)
                     elide: Text.ElideRight
                 }
 
@@ -68,6 +67,7 @@ Window {
             target: FileManager
             onDuplicateSearchCompleted: {
                 waitDialog.resultText = result
+                equalFiles.model = duplicateFiles
             }
             onProcessedCountChanged: {
                 waitDialog.fileCount = processedCount

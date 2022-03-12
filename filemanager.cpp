@@ -6,10 +6,8 @@
 #include <QFileInfo>
 #include <QtConcurrent>
 
-FileManager::FileManager(QObject *parent) : QObject(parent), m_processedFileCount(0) {}
-
-QList<QStringList> FileManager::duplicateFiles() const {
-    return m_duplicateFiles;
+FileManager::FileManager(QObject *parent) : QObject(parent), m_processedFileCount(0) {
+    qRegisterMetaType<QList<QStringList>>();
 }
 
 void FileManager::findDuplicateFiles(const QString &firstDirPath, const QString &secondDirPath) {
@@ -23,34 +21,57 @@ void FileManager::findDuplicateFiles(const QString &firstDirPath, const QString 
         emit duplicateSearchCompleted(tr("Директория %1 не существует").arg(secondDirPath));
         return;
     }
-    QDir::Filters entryFilter = QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot;
-    QDir dir(firstDirPath);
-    if(dir.isEmpty(entryFilter)) {
-        emit duplicateSearchCompleted(tr("Директория %1 пуста").arg(firstDirPath));
+    int firstDirCount = getFilesCount(firstDirPath);
+    if(firstDirCount == 0) {
+        emit duplicateSearchCompleted(tr("В директории %1 не найдено файлов").arg(firstDirPath));
         return;
     }
-    dir.setPath(secondDirPath);
-    if(dir.isEmpty(entryFilter)) {
-        emit duplicateSearchCompleted(tr("Директория %1 пуста").arg(secondDirPath));
+    int secondDirCount = getFilesCount(secondDirPath);
+    if(secondDirCount == 0) {
+        emit duplicateSearchCompleted(tr("В директории %1 не найдено файлов").arg(secondDirPath));
         return;
     }
-    m_sourceDirPath = firstDirPath;
-    m_comparedDirPath = secondDirPath;
+
+    // Для ускорения поиска используем в качестве папки, файлы которой сравниваем с файлами другой папки,
+    // ту, в которой меньше файлов
+    if(firstDirCount <= secondDirCount) {
+        m_sourceDirPath = firstDirPath;
+        m_comparedDirPath = secondDirPath;
+    }
+    else {
+        m_sourceDirPath = secondDirPath;
+        m_comparedDirPath = firstDirPath;
+    }
+
     QtConcurrent::run(this, &FileManager::findDuplicates);
 }
 
 void FileManager::findDuplicates() {
-    m_duplicateFiles = recoursiveFindDuplicate(m_sourceDirPath);
-    emit duplicateFilesChanged(m_duplicateFiles);
+    QList<QStringList> duplicateFiles = recoursiveFindDuplicate(m_sourceDirPath);
 
     int count = 0;
-    foreach (QVariant list, m_duplicateFiles)
+    foreach (QVariant list, duplicateFiles)
         count += list.toStringList().count();
-    emit duplicateSearchCompleted(tr("Поиск завершён. Найдено дубликатов: %1").arg(count));
+    emit duplicateSearchCompleted(tr("Поиск завершён. Найдено дубликатов: %1").arg(count), duplicateFiles);
 
     m_processedFileCount = 0;
     m_sourceDirPath = "";
     m_comparedDirPath = "";
+}
+
+int FileManager::getFilesCount(const QString &dirPath) {
+    int count = 0;
+    foreach(QString entry, QDir(dirPath).entryList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot)) {
+        QString entryPath = dirPath + QDir::separator() + entry;
+        QFileInfo entryInf(entryPath);
+        if(entryInf.isDir()) {
+            count += getFilesCount(entryPath);
+        }
+        else {
+            count++;
+        }
+    }
+    return count;
 }
 
 QList<QStringList> FileManager::recoursiveFindDuplicate(const QString &dirPath) {
@@ -117,6 +138,7 @@ QString FileManager::getHashMd5(const QString &filePath) {
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
         return QString();
 
+    // Файлы могут быть очень большого размера, поэтому считываем данные блоками
     QCryptographicHash hash(QCryptographicHash::Md5);
     while (!file.atEnd()) {
         QByteArray data = file.read(8192);
