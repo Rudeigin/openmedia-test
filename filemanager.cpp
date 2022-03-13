@@ -47,12 +47,42 @@ void FileManager::findDuplicateFiles(const QString &firstDirPath, const QString 
 }
 
 void FileManager::findDuplicates() {
-    QList<QStringList> duplicateFiles = recoursiveFindDuplicate(m_sourceDirPath);
+    QList<QStringList> result;
+    QDirIterator it(m_sourceDirPath, QStringList(),  QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        QString sourceFilePath = it.next();
+        QFileInfo entryInf(sourceFilePath);
+        if(!entryInf.isReadable())
+            continue;
+
+        QString hash = getHashMd5(sourceFilePath);
+        QStringList duplicates;
+        QDirIterator it(m_comparedDirPath, QStringList(),  QDir::Files, QDirIterator::Subdirectories);
+        while (it.hasNext()) {
+            QString comparedFilePath = it.next();
+            QFileInfo entryInf(comparedFilePath);
+            if(!entryInf.isReadable())
+                continue;
+
+            if(entryInf.size() != entryInf.size())
+                continue;
+
+            if(hash == getHashMd5(comparedFilePath))
+                duplicates.append(comparedFilePath);
+        }
+        if(!duplicates.isEmpty()) {
+            duplicates.prepend(sourceFilePath);
+            result.append(duplicates);
+        }
+
+        m_processedFileCount++;
+        emit processedCountChanged(m_processedFileCount);
+    }
 
     int count = 0;
-    foreach (QVariant list, duplicateFiles)
-        count += list.toStringList().count();
-    emit duplicateSearchCompleted(tr("Поиск завершён. Найдено дубликатов: %1").arg(count), duplicateFiles);
+    foreach (QStringList list, result)
+        count += list.count();
+    emit duplicateSearchCompleted(tr("Поиск завершён. Найдено дубликатов: %1").arg(count), result);
 
     m_processedFileCount = 0;
     m_sourceDirPath = "";
@@ -61,76 +91,12 @@ void FileManager::findDuplicates() {
 
 int FileManager::getFilesCount(const QString &dirPath) {
     int count = 0;
-    foreach(QString entry, QDir(dirPath).entryList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot)) {
-        QString entryPath = dirPath + QDir::separator() + entry;
-        QFileInfo entryInf(entryPath);
-        if(entryInf.isDir()) {
-            count += getFilesCount(entryPath);
-        }
-        else {
-            count++;
-        }
+    QDirIterator it(dirPath, QStringList(),  QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        it.next();
+        count++;
     }
     return count;
-}
-
-QList<QStringList> FileManager::recoursiveFindDuplicate(const QString &dirPath) {
-    QDir::Filters entryFilter = QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot;
-    QDir firstDir(dirPath);
-    if(firstDir.isEmpty(entryFilter))
-        return QList<QStringList>();
-
-    QList<QStringList> result;
-    foreach(QString entry, firstDir.entryList(entryFilter)) {
-        QString entryPath = dirPath + QDir::separator() + entry;
-        QFileInfo entryInf(entryPath);
-        if(entryInf.isDir()) {
-            QList<QStringList> duplicates = recoursiveFindDuplicate(entryPath);
-            if(!duplicates.isEmpty())
-                result.append(duplicates);
-        }
-        else {
-            if(!entryInf.isReadable())
-                continue;
-
-            QStringList duplicates = findDuplicateByHash(getHashMd5(entryPath), entryInf.size(), m_comparedDirPath);
-            if(!duplicates.isEmpty()) {
-                duplicates.prepend(entryPath);
-                result.append(duplicates);
-            }
-
-            m_processedFileCount++;
-            emit processedCountChanged(m_processedFileCount);
-        }
-    }
-    return result;
-}
-
-QStringList FileManager::findDuplicateByHash(const QString &hash, const int &fileSize, const QString &dirPath) {
-    QDir::Filters entryFilter = QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot;
-    QDir dir(dirPath);
-    if(dir.isEmpty(entryFilter))
-        return QStringList();
-
-    QStringList result;
-    foreach(QString entry, dir.entryList(entryFilter)) {
-        QString entryPath = dirPath + QDir::separator() + entry;
-        QFileInfo entryInf(entryPath);
-        if(!entryInf.isReadable())
-            continue;
-
-        if(entryInf.isDir()) {
-            result.append(findDuplicateByHash(hash, fileSize, entryPath));
-        }
-        else {
-            if(entryInf.size() != fileSize)
-                continue;
-
-            if(hash == getHashMd5(entryPath))
-                result.append(entryPath);
-        }
-    }
-    return result;
 }
 
 QString FileManager::getHashMd5(const QString &filePath) {

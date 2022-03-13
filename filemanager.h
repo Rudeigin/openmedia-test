@@ -23,12 +23,7 @@ private:
     QString m_comparedDirPath;
     int m_processedFileCount;
 
-    // Рекурсивная функция подсчёта количества всех файлов в папке
     int getFilesCount(const QString &dirPath);
-    QList<QStringList> recoursiveFindDuplicate(const QString &dirPath);
-    // Рекурсивная функция. Передаём сразу хэш файла, дубликаты которого ищем в директории dirPath,
-    // чтобы не вычислять его каждый раз при поиске во вложенных папках
-    QStringList findDuplicateByHash(const QString &hash, const int &fileSize, const QString &dirPath);
     QString getHashMd5(const QString &filePath);
 };
 #endif // FILEMANAGER_H
