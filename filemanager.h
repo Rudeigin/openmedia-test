@@ -12,18 +12,13 @@ public:
     Q_INVOKABLE void findDuplicateFiles(const QString &firstDirPath, const QString &secondDirPath);
 
 private slots:
-    void findDuplicates();
+    void findDuplicates(const QString &firstDirPath, const QString &secondDirPath);
 
 signals:
-    void processedCountChanged(const int &processedCount);
     void duplicateSearchCompleted(QString result, QList<QStringList> duplicateFiles = QList<QStringList>());
 
 private:
-    QString m_sourceDirPath;
-    QString m_comparedDirPath;
-    int m_processedFileCount;
-
-    int getFilesCount(const QString &dirPath);
     QString getHashMd5(const QString &filePath);
+    QMultiHash<QString, QString> getHashMap(const QString &dirPath);
 };
 #endif // FILEMANAGER_H

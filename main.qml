@@ -69,9 +69,6 @@ Window {
                 waitDialog.resultText = result
                 equalFiles.model = duplicateFiles
             }
-            onProcessedCountChanged: {
-                waitDialog.fileCount = processedCount
-            }
         }
     }
 
@@ -83,12 +80,11 @@ Window {
         title: qsTr("Выполняется поиск")
         modal: true
         closePolicy: Popup.NoAutoClose
-        property int fileCount: 0
         property string resultText
 
         Text {
             id: state
-            text: qsTr("Проверено файлов: %L1\n").arg(waitDialog.fileCount) + waitDialog.resultText
+            text: waitDialog.resultText === "" ? qsTr("Выполняется поиск...") : waitDialog.resultText
             anchors.centerIn: parent
         }
 
@@ -101,7 +97,6 @@ Window {
         }
 
         onRejected: {
-            fileCount = 0
             resultText = ""
         }
     }
