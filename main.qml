@@ -49,7 +49,7 @@ Window {
                 clip: true
                 delegate: Label {
                     width: equalFiles.width
-                    text: index + ". " + equalFiles.createString(modelData)
+                    text: (index+1) + ". " + equalFiles.createString(modelData)
                     elide: Text.ElideRight
                 }
 

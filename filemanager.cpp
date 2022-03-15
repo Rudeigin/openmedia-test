@@ -5,9 +5,11 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QtConcurrent>
+#include <QFuture>
 
 FileManager::FileManager(QObject *parent) : QObject(parent) {
     qRegisterMetaType<QList<QStringList>>();
+    connect(&m_watcher, SIGNAL(finished()), this, SLOT(printResults()));
 }
 
 void FileManager::findDuplicateFiles(const QString &firstDirPath, const QString &secondDirPath) {
@@ -22,24 +24,30 @@ void FileManager::findDuplicateFiles(const QString &firstDirPath, const QString 
         return;
     }
 
-    QtConcurrent::run(this, &FileManager::findDuplicates, firstDirPath, secondDirPath);
+    QFuture<QList<QStringList>> future = QtConcurrent::run(this, &FileManager::findDuplicates, firstDirPath, secondDirPath);
+    m_watcher.setFuture(future);
 }
 
-void FileManager::findDuplicates(const QString &firstDirPath, const QString &secondDirPath) {
+ QList<QStringList> FileManager::findDuplicates(const QString &firstDirPath, const QString &secondDirPath) {
     QList<QStringList> result;
     QMultiHash<QString, QString> first = getHashMap(firstDirPath);
     QMultiHash<QString, QString> second = getHashMap(secondDirPath);
-    foreach(QString hashSum, first.keys()) {
+    foreach(QString hashSum, first.uniqueKeys()) {
         QStringList duplicates = second.values(hashSum);
         if(!duplicates.isEmpty()) {
             result.append(first.values(hashSum) + duplicates);
         }
     }
-    int count = 0;
-    foreach (QVariant list, result)
-        count += list.toStringList().count();
-    emit duplicateSearchCompleted(tr("Поиск завершён. Найдено дубликатов: %1").arg(count), result);
-}
+    return result;
+ }
+
+ void FileManager::printResults()  {
+     QList<QStringList> result = m_watcher.result();
+     int count = 0;
+     foreach (QVariant list, result)
+         count += list.toStringList().count();
+     emit duplicateSearchCompleted(tr("Поиск завершён. Найдено дубликатов: %1").arg(count), result);
+ }
 
 QString FileManager::getHashMd5(const QString &filePath) {
     QFile file(filePath);
