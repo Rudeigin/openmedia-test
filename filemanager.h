@@ -21,7 +21,7 @@ signals:
 
 private:
     QString getHashMd5(const QString &filePath);
-    QMultiHash<QString, QString> getHashMap(const QString &dirPath);
+    QByteArray getFirstBytes(const QString &filePath);
 
     QFutureWatcher<QList<QStringList>> m_watcher;
 };
